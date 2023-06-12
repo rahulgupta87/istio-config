@@ -1,0 +1,41 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: demo-virtual-service
+  namespace: demo-istio
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - demo-istio/internal-gateway-demo
+  http:
+    - match:
+      - uri:
+          prefix: "/microA/"
+      rewrite:
+        uri: "/"
+      route:
+      - destination:
+          host: micro-a-cip-svc
+          port:
+            number: 80
+    - match:
+      - uri:
+          prefix: "/microB/"
+      rewrite:
+        uri: "/"
+      route:
+      - destination:
+          host: micro-b-cip-svc
+          port:
+            number: 80
+    - match:
+      - uri:
+          prefix: "/microC/"
+      rewrite:
+        uri: "/"
+      route:
+      - destination:
+          host: micro-c-cip-svc
+          port:
+            number: 80

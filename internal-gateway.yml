@@ -1,0 +1,15 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: internal-gateway-demo
+  namespace: demo-istio
+spec:
+  selector:
+    istio: ingressgateway-demo # use istio default controller
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP2
+    hosts:
+      - "*"

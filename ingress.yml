@@ -1,0 +1,130 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: demo-ingress-alb
+  namespace: demo-istio
+  annotations:
+    # create AWS Application LoadBalancer
+    kubernetes.io/ingress.class: alb
+    # external type
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: instance
+    # AWS Certificate Manager certificate's ARN
+    # alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:eu-west-3:***:certificate/fcaa9fd2-1b55-48d7-92f2-e829f7bafafd"
+    # open ports 80 and 443 
+    # alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+    # redirect all HTTP to HTTPS
+    # alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
+    # ExternalDNS settings: https://rtfm.co.ua/en/kubernetes-update-aws-route53-dns-from-an-ingress/
+    # external-dns.alpha.kubernetes.io/hostname: "istio-test-alb.example.com"
+spec:
+  rules:
+  - http:
+      paths:
+        - path: /microA/
+          backend:
+            serviceName: istio-ingressgateway-demo
+            servicePort: 80
+        - path: /microB/
+          backend:
+            serviceName: istio-ingressgateway-demo
+            servicePort: 80
+        - path: /microC/
+          backend:
+            serviceName: istio-ingressgateway-demo
+            servicePort: 80
+        - path: /*
+          backend:
+            serviceName: istio-ingressgateway-demo
+            servicePort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: istio-ingressgateway-demo
+  namespace: demo-istio
+  # annotations:
+  #   service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+  #   service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+spec:
+  type: NodePort
+  selector:
+    istio: ingressgateway-demo
+  ports:
+  - port: 80
+    name: http
+  - port: 443
+    name: https
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: istio-ingressgateway-demo
+  namespace: demo-istio
+spec:
+  selector:
+    matchLabels:
+      istio: ingressgateway-demo
+  template:
+    metadata:
+      annotations:
+        # Select the gateway injection template (rather than the default sidecar template)
+        inject.istio.io/templates: gateway
+      labels:
+        # Set a unique label for the gateway. This is required to ensure Gateways can select this workload
+        istio: ingressgateway-demo
+        # Enable gateway injection. If connecting to a revisioned control plane, replace with "istio.io/rev: revision-name"
+        sidecar.istio.io/inject: "true"
+    spec:
+      containers:
+      - name: istio-proxy
+        image: auto # The image will automatically update each time the pod starts.
+        resources:
+            limits:
+              cpu: 500m
+            requests:
+              cpu: 200m
+---
+# Set up roles to allow reading credentials for TLS
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: istio-ingressgateway-demo-sds
+  namespace: demo-istio
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: istio-ingressgateway-demo-sds
+  namespace: demo-istio
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: istio-ingressgateway-demo-sds
+subjects:
+- kind: ServiceAccount
+  name: default
+---
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: istio-ingressgateway-demo
+  namespace: demo-istio
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: istio-ingressgateway-demo
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80

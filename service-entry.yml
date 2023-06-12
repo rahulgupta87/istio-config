@@ -1,0 +1,13 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: dem-service-entries
+  namespace: demo-istio
+spec:
+  hosts:
+  - 'endpoint of provider'
+  ports:
+  - number: XXXX
+    name: tcp
+    protocol: TCP
+  location: MESH_EXTERNAL
